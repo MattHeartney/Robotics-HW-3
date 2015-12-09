@@ -1,0 +1,8 @@
+prefix=/home/matt/Documents/ros_sandbox/hw3/devel
+
+Name: baxter_core_msgs
+Description: Description of baxter_core_msgs
+Version: 1.1.1
+Cflags: -I/home/matt/Documents/ros_sandbox/hw3/devel/include
+Libs: -L/home/matt/Documents/ros_sandbox/hw3/devel/lib 
+Requires: message_runtime geometry_msgs sensor_msgs std_msgs

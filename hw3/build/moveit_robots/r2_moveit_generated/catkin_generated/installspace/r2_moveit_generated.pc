@@ -1,0 +1,8 @@
+prefix=/home/matt/Documents/ros_sandbox/hw3/install
+
+Name: r2_moveit_generated
+Description: Description of r2_moveit_generated
+Version: 1.0.3
+Cflags: 
+Libs: -L/home/matt/Documents/ros_sandbox/hw3/install/lib 
+Requires: 

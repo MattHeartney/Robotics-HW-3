@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "hw3")
+set(hw3_MAINTAINER "matei <matei@todo.todo>")
+set(hw3_DEPRECATED "")
+set(hw3_VERSION "0.0.0")
+set(hw3_BUILD_DEPENDS "actionlib" "control_msgs" "moveit_commander" "moveit_msgs" "rospy" "interactive_markers" "sensor_msgs" "tf")
+set(hw3_RUN_DEPENDS "actionlib" "control_msgs" "interactive_markers" "moveit_commander" "moveit_msgs" "rospy" "sensor_msgs" "tf")
+set(hw3_BUILDTOOL_DEPENDS "catkin")

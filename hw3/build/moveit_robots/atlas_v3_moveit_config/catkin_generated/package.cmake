@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "atlas_v3_moveit_config")
+set(atlas_v3_moveit_config_MAINTAINER "MoveIt Setup Assistant <assistant@moveit.ros.org>, Sachin Chitta <robot.moveit@gmail.com>")
+set(atlas_v3_moveit_config_DEPRECATED "")
+set(atlas_v3_moveit_config_VERSION "1.0.3")
+set(atlas_v3_moveit_config_BUILD_DEPENDS "atlas_moveit_config")
+set(atlas_v3_moveit_config_RUN_DEPENDS "moveit_ros_move_group" "xacro" "atlas_moveit_config")
+set(atlas_v3_moveit_config_BUILDTOOL_DEPENDS "catkin")

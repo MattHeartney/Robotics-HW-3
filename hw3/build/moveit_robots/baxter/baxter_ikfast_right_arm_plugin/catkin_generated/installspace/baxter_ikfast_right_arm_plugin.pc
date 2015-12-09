@@ -1,0 +1,8 @@
+prefix=/home/matt/Documents/ros_sandbox/hw3/install
+
+Name: baxter_ikfast_right_arm_plugin
+Description: Description of baxter_ikfast_right_arm_plugin
+Version: 1.0.3
+Cflags: 
+Libs: -L/home/matt/Documents/ros_sandbox/hw3/install/lib 
+Requires: moveit_core pluginlib roscpp tf_conversions

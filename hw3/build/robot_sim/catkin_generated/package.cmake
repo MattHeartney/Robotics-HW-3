@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "robot_sim")
+set(robot_sim_MAINTAINER "matei <matei@todo.todo>")
+set(robot_sim_DEPRECATED "")
+set(robot_sim_VERSION "0.0.0")
+set(robot_sim_BUILD_DEPENDS "baxter_core_msgs" "roscpp" "sensor_msgs" "urdf")
+set(robot_sim_RUN_DEPENDS "baxter_core_msgs" "forward_kinematics" "roscpp" "sensor_msgs" "urdf")
+set(robot_sim_BUILDTOOL_DEPENDS "catkin")

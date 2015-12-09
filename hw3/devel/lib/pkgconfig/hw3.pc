@@ -1,0 +1,8 @@
+prefix=/home/matt/Documents/ros_sandbox/hw3/devel
+
+Name: hw3
+Description: Description of hw3
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/matt/Documents/ros_sandbox/hw3/devel/lib 
+Requires: actionlib control_msgs interactive_markers moveit_commander moveit_msgs rospy sensor_msgs tf

@@ -1,0 +1,8 @@
+prefix=/home/matt/Documents/ros_sandbox/hw3/devel
+
+Name: baxter_moveit_config
+Description: Description of baxter_moveit_config
+Version: 1.0.3
+Cflags: 
+Libs: -L/home/matt/Documents/ros_sandbox/hw3/devel/lib 
+Requires: 
