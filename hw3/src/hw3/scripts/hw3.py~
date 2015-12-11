@@ -353,10 +353,7 @@ class MoveArm(object):
 					q_temp[pos] -= q_current[pos]
 					q_temp[pos] *= .1*valid_check
 					q_temp[pos] += q_current[pos]
-				if not(self.is_state_valid(q_temp)):
-					valid_check = -1
-			if (valid_check == 5):
-				q_points.append(q_intermediate)
+			q_points.append(q_intermediate)
 	best_index = -1
 	min_distance = self.is_close_to(q_goal, q_current)
 	for pos in range(1,len(q_points)):
