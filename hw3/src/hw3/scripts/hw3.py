@@ -296,13 +296,24 @@ class MoveArm(object):
 	#q_list.append(self.create_rrt_map(q_start,q_goal, q_min, q_max))
         #q_list.append(q_goal)
 
+	# Wait for moveit IK service
+        rospy.wait_for_service("compute_fk")
+        self.fk_service = rospy.ServiceProxy('compute_fk',  moveit_msgs.srv.GetPositionFK)
+        print "FK service ready"
+
+	#print self.FK(q_start)
+
 	print "\nSTARTING DISTANCE\n"
 	print self.is_close_to(q_goal, q_list[len(q_list)-1])
-	while (len(q_list) != 2000 and 2 < self.is_close_to(q_goal, q_list[len(q_list)-1])):
+	while (len(q_list) != 2000 and 2.5 < self.is_close_to(q_goal, q_list[len(q_list)-1])):
 		q_list.append(self.create_rrt_map(q_list[len(q_list)-1], q_goal, q_min, q_max))
 		print "\nAdded Distance"
 		print self.is_close_to(q_goal, q_list[len(q_list)-1])
 	q_list.append(q_goal)
+
+	if (len(q_list) > 2000):
+		print "\nEXCEEDED 2000 POINTS, ABORTING\n"
+		return [],[],[]
 
 	print "\nExample q_list:"
         print q_list
@@ -312,17 +323,55 @@ class MoveArm(object):
         # for each trajectory segment.
         v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
-        #print v_list
-        #print a_list
-        #print "Example t:"
-        #print t
-        return q_list, v_list, a_list, t
+	v_test,a_test, coeffs = self.create_splined_timings(q_list)
+        #print v_test
+        #print a_test
+	print "\nq_list length\n"
+	print len(q_list)
+	print "\nCoeff stuff\n"
+	print len(coeffs)
+	print coeffs
+        
+	self.plot_trajectory(len(q_list)-1, coeffs, 1)
+
+        return q_list, v_test, a_test, t
         # ---------------------------------------------------------------
 
+	#	An attempt to reverse engineer the IK into a FK
+#    def FK(self, q_goal):
+        #req = moveit_msgs.srv.GetPositionFKRequest()
+        #req.fk_request.group_name = "left_arm"
+        #req.fk_request.robot_state = moveit_msgs.msg.RobotState()
+        #req.fk_request.robot_state.joint_state = self.joint_state
+        #req.fk_request.pose_stamped = geometry_msgs.msg.PoseStamped()
+        #req.fk_request.pose_stamped.header.frame_id = "base"
+        #req.fk_request.pose_stamped.header.stamp = rospy.get_rostime()
+        #req.fk_request.pose_stamped.pose = convert_to_message(T_goal)
+        #req.fk_request.timeout = rospy.Duration(3.0)
+        #res = self.fk_service(req)
+	#fk_request = kinematics_msgs.GetPositionFK.Request;
+	#kinematics_msgs::GetPositionFK::Response fk_response;
+	#fk_request.header.frame_id = "base";
+	#fk_request.pose_stamped.header.stamp = rospy.get_rostime()
+	#fk_request.fk_link_names = self.joint_names
+	#fk_request.robot_state.joint_state.position.resize (response.kinematic_solver_info.joint_names.size());
+	#fk_request.robot_state.joint_state.name = response.kinematic_solver_info.joint_names;
+        #q = []
+	#print "\nIMPORTANT\n"
+	#print res.error_code
+	#print "\nIMPORTANT\n"
+        #if fk_response.error_code.val == res.error_code.SUCCESS:
+#		print "\nIMPORTANT\n"
+#		print res.solution
+#		print "\nIMPORTANT\n"
+#            	q = self.q_from_joint_state(res.solution.joint_state)
+#        return q
+
+    #	Used to calculate the next closest rrt point
     def create_rrt_map (self, q_current, q_goal, q_min, q_max):
 	#	Form a random point in the possible configuration space
 	q_points = []
-	for count in range(0,50):	#Create 50 points around each current position
+	for count in range(0,20):	#Create 50 points around each current position
 		q_intermediate = []
 		for pos in range (0,len(q_max)):
 			q_range = q_max[pos] - q_min[pos]
@@ -348,13 +397,14 @@ class MoveArm(object):
 		if (self.is_state_valid(q_intermediate)):
 			valid_check = 1
 			while (valid_check < 5 and valid_check != -1):
-				q_temp = copy(q_intermediate)
+				q_temp = deepcopy(q_intermediate)
 				for temp_pos in range(0,len(q_temp)):
 					q_temp[pos] -= q_current[pos]
 					q_temp[pos] *= .1*valid_check
 					q_temp[pos] += q_current[pos]
 				if not(self.is_state_valid(q_temp)):
 					valid_check = -1
+				valid_check += 1
 			if (valid_check == 5):
 				q_points.append(q_intermediate)
 	best_index = -1
@@ -368,12 +418,53 @@ class MoveArm(object):
 		return self.create_rrt_map(q_current, q_goal, q_min, q_max)
 	return q_points[best_index]
 
-    #Calculates the absolute change in all q values to reach the goal
+    #	Calculates the absolute change in all q values to reach the goal
     def is_close_to (self,q_goal, q_to_check):
 	delta = 0
 	for x in range(0,len(q_goal)):
 		delta += abs(q_goal[x] - q_to_check[x])
 	return delta
+
+    #	Combines all q_list values into v_lists, a_lists and plot coeffs
+	#_____STILL HAS A PROBLEM WHEN NO INTERPOLATED POINTS_SPLIT_LATER______
+    def create_splined_timings (self, q_list):
+	v_list = [[0,0,0,0,0,0,0]]
+	a_list = [[0,0,0,0,0,0,0]]
+	coeff_list = []
+	for pos in range (1,len(q_list)-1):
+		temp = self.create_cubic(q_list[pos-1], v_list[pos-1], a_list[pos-1], q_list[pos])
+		v_list.append(temp[0])
+		a_list.append(temp[1])
+		print "\nTEMP[2]\n"
+		print temp[2]
+		coeff_list.append(temp[2][0][0])
+		coeff_list.append(temp[2][0][1])
+		coeff_list.append(temp[2][0][2])
+		coeff_list.append(temp[2][0][3])
+	v_list.append([0,0,0,0,0,0,0])
+	a_list.append([0,0,0,0,0,0,0])
+	coeff_list.append(q_list[len(q_list)-1][0] - q_list[len(q_list)-2][0] - (.5*a_list[len(v_list)-2][0]) - v_list[len(v_list)-2][0])
+	coeff_list.append((3*q_list[len(q_list)-1][0]) - (3*q_list[len(q_list)-2][0])- (2*v_list[len(v_list)-2][0]))
+	coeff_list.append(v_list[len(v_list)-2][0])
+	coeff_list.append(q_list[len(v_list)-2][0])
+	return v_list, a_list, coeff_list
+
+    #	Creates the inbetween cubic functions for kinematic graphs to spline
+    def create_cubic(self, q_current, v_current, a_current, q_next):
+	v_next = []
+	a_next = []
+	coeff_list = []
+	for pos in range(0,len(q_current)):
+		d = q_current[pos]	
+		c = v_current[pos]
+		b = a_current[pos]/2
+		a = q_next[pos] -d - c - b
+		v_next.append((3*a) + (2*b) + c)
+		a_next.append((6*a) + (2*b))
+		if (pos == 0):
+			coeff_list.append([a,b,c,d])
+	
+	return (v_next, a_next,coeff_list)
 
     def project_plan(self, q_start, q_goal, q_min, q_max):
         q_list, v_list, a_list, t = self.motion_plan(q_start, q_goal, q_min, q_max)
