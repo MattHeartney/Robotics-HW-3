@@ -33,7 +33,7 @@ def convert_to_message(T):
     t.orientation.x = orientation[0]
     t.orientation.y = orientation[1]
     t.orientation.z = orientation[2]
-    t.orientation.w = orientation[3]        
+    t.orientation.w = orientation[3]
     return t
 
 def convert_from_message(msg):
@@ -41,8 +41,8 @@ def convert_from_message(msg):
                                               msg.orientation.y,
                                               msg.orientation.z,
                                               msg.orientation.w))
-    T = tf.transformations.translation_matrix((msg.position.x, 
-                                               msg.position.y, 
+    T = tf.transformations.translation_matrix((msg.position.x,
+                                               msg.position.y,
                                                msg.position.z))
     return numpy.dot(T,R)
 
@@ -80,7 +80,7 @@ class MoveArm(object):
         self.init_marker()
 
         # Connect to trajectory execution action
-        self.trajectory_client = actionlib.SimpleActionClient('/robot/limb/left/follow_joint_trajectory', 
+        self.trajectory_client = actionlib.SimpleActionClient('/robot/limb/left/follow_joint_trajectory',
                                                               control_msgs.msg.FollowJointTrajectoryAction)
         self.trajectory_client.wait_for_server()
         print "Joint trajectory client connected"
@@ -92,14 +92,14 @@ class MoveArm(object):
 
         # Wait for validity check service
         rospy.wait_for_service("check_state_validity")
-        self.state_valid_service = rospy.ServiceProxy('check_state_validity',  
+        self.state_valid_service = rospy.ServiceProxy('check_state_validity',
                                                       moveit_msgs.srv.GetStateValidity)
         print "State validity service ready"
 
         # Initialize MoveIt
         self.robot = moveit_commander.RobotCommander()
         self.scene = moveit_commander.PlanningSceneInterface()
-        self.group = moveit_commander.MoveGroupCommander("left_arm") 
+        self.group = moveit_commander.MoveGroupCommander("left_arm")
         print "MoveIt! interface ready"
 
         # How finely to sample each joint
@@ -132,7 +132,7 @@ class MoveArm(object):
         i = joint_state.name.index(name)
         joint_state.position[i] = q
 
-    """ Given a complete joint_state data structure, this function finds the values for 
+    """ Given a complete joint_state data structure, this function finds the values for
     a particular set of joints in a particular order (in our case, the left arm joints ordered
     from proximal to distal) and returns a list q[] containing just those values.
     """
@@ -147,7 +147,7 @@ class MoveArm(object):
         q.append(self.get_joint_val(joint_state, "left_w2"))
         return q
 
-    """ Given a list q[] of joint values and an already populated joint_state, this function assumes 
+    """ Given a list q[] of joint values and an already populated joint_state, this function assumes
     that the passed in values are for a particular set of joints in a particular order (in our case,
     the left arm joints ordered from proximal to distal) and edits the joint_state data structure to
     set the values to the ones passed in.
@@ -159,7 +159,7 @@ class MoveArm(object):
         self.set_joint_val(joint_state, q[3], "left_e1")
         self.set_joint_val(joint_state, q[4], "left_w0")
         self.set_joint_val(joint_state, q[5], "left_w1")
-        self.set_joint_val(joint_state, q[6], "left_w2")        
+        self.set_joint_val(joint_state, q[6], "left_w2")
 
     """ Creates simple timing information for a trajectory, where each point has velocity
     and acceleration 0 for all joints, and all segments take the same amount of time
@@ -194,7 +194,7 @@ class MoveArm(object):
 
     """ This function checks if a set of joint angles q[] creates a valid state, or one that is free
     of collisions. The values in q[] are assumed to be values for the joints of the left arm, ordered
-    from proximal to distal. 
+    from proximal to distal.
     """
     def is_state_valid(self, q):
         req = moveit_msgs.srv.GetStateValidityRequest()
@@ -208,7 +208,7 @@ class MoveArm(object):
         return res.valid
 
     # This function will plot the position, velocity and acceleration of a joint
-    # based on the polynomial coefficients of each segment that makes up the 
+    # based on the polynomial coefficients of each segment that makes up the
     # trajectory.
     # Arguments:
     # - num_segments: the number of segments in the trajectory
@@ -216,7 +216,7 @@ class MoveArm(object):
     #   as follows [a_1, b_1, c_1, d_1, ..., a_n, b_n, c_n, d_n], where n is the number
     #   of segments
     # - time_per_segment: the time (in seconds) allocated to each segment.
-    # This function will display three plots. Execution will continue only after all 
+    # This function will display three plots. Execution will continue only after all
     # plot windows have been closed.
     def plot_trajectory(self, num_segments, coeffs, time_per_segment):
         resolution = 1.0e-2
@@ -245,8 +245,8 @@ class MoveArm(object):
     - q_goal: the goal configuration for the arm
     - q_min and q_max: the min and max values for all the joints in the arm.
     All the above parameters are arrays. Each will have 7 elements, one for each joint in the arm.
-    These values correspond to the joints of the arm ordered from proximal (closer to the body) to 
-    distal (further from the body). 
+    These values correspond to the joints of the arm ordered from proximal (closer to the body) to
+    distal (further from the body).
 
     The function must return a trajectory as a tuple (q_list,v_list,a_list,t).
     If the trajectory has n points, then q_list, v_list and a_list must all have n entries. Each
@@ -256,11 +256,11 @@ class MoveArm(object):
     - q_list[i]: an array of 7 numbers specifying position for all joints at trajectory point i
     - v_list[i]: an array of 7 numbers specifying velocity for all joints at trajectory point i
     - a_list[i]: an array of 7 numbers specifying acceleration for all joints at trajectory point i
-    Note that q_list, v_list and a_list are all lists of arrays. 
-    For example, q_list[i][j] will be the position of the j-th joint (0<j<7) at trajectory point i 
+    Note that q_list, v_list and a_list are all lists of arrays.
+    For example, q_list[i][j] will be the position of the j-th joint (0<j<7) at trajectory point i
     (0 < i < n).
 
-    For example, a trajectory with just 2 points, starting from all joints at position 0 and 
+    For example, a trajectory with just 2 points, starting from all joints at position 0 and
     ending with all joints at position 1, might look like this:
 
     q_list=[ numpy.array([0, 0, 0, 0, 0, 0, 0]),
@@ -269,9 +269,9 @@ class MoveArm(object):
              numpy.array([0, 0, 0, 0, 0, 0, 0]) ]
     a_list=[ numpy.array([0, 0, 0, 0, 0, 0, 0]),
              numpy.array([0, 0, 0, 0, 0, 0, 0]) ]
-             
+
     Note that the trajectory should always begin from the current configuration of the robot.
-    Hence, the first entry in q_list should always be equal to q_start. 
+    Hence, the first entry in q_list should always be equal to q_start.
 
     In addition, t must be a list with n entries (where n is the number of points in the trajectory).
     For the i-th trajectory point, t[i] must specify when this point should be reached, relative to
@@ -284,10 +284,10 @@ class MoveArm(object):
 
     return q_list,v_list,a_list,t
 
-    In addition, you can use the function self.is_state_valid(q_test) to test if the joint positions 
-    in a given array q_test create a valid (collision-free) state. q_test will be expected to 
+    In addition, you can use the function self.is_state_valid(q_test) to test if the joint positions
+    in a given array q_test create a valid (collision-free) state. q_test will be expected to
     contain 7 elements, each representing a joint position, in the same order as q_start and q_goal.
-    """               
+    """
     def motion_plan(self, q_start, q_goal, q_min, q_max):
         # ---------------- replace this with your code ------------------
         # This simple example creates a trajectory with just the start and goal points
@@ -301,38 +301,46 @@ class MoveArm(object):
         self.fk_service = rospy.ServiceProxy('compute_fk',  moveit_msgs.srv.GetPositionFK)
         print "FK service ready"
 
-	#print self.FK(q_start)
+    	#print self.FK(q_start)
 
-	print "\nSTARTING DISTANCE\n"
-	print self.is_close_to(q_goal, q_list[len(q_list)-1])
-	while (len(q_list) != 2000 and 2.5 < self.is_close_to(q_goal, q_list[len(q_list)-1])):
-		q_list.append(self.create_rrt_map(q_list[len(q_list)-1], q_goal, q_min, q_max))
-		print "\nAdded Distance"
-		print self.is_close_to(q_goal, q_list[len(q_list)-1])
-	q_list.append(q_goal)
+        print "\nSTARTING DISTANCE\n"
+        print self.is_close_to(q_goal, q_list[len(q_list)-1])
+        while (len(q_list) != 2000 and 2.5 < self.is_close_to(q_goal, q_list[len(q_list)-1])):
+            q_list.append(self.create_rrt_map(q_list[len(q_list)-1], q_goal, q_min, q_max))
+            print "\nAdded Distance"
+            print self.is_close_to(q_goal, q_list[len(q_list)-1])
+        q_list.append(q_goal)
 
-	if (len(q_list) > 2000):
-		print "\nEXCEEDED 2000 POINTS, ABORTING\n"
-		return [],[],[]
+        #SHORTCUTTING
+        print "\n Shortcut"
+        self.shortcut(q_list)
 
-	print "\nExample q_list:"
+        print q_list
+        #RESAMPLING
+        self.resample(q_list)
+
+        if (len(q_list) > 2000):
+            print "\nEXCEEDED 2000 POINTS, ABORTING\n"
+            return [],[],[]
+
+    	print "\nExample q_list:"
         print q_list
 
-        # A provided convenience function creates the velocity and acceleration data, 
+        # A provided convenience function creates the velocity and acceleration data,
         # assuming 0 velocity and acceleration at each intermediate point, and 10 seconds
         # for each trajectory segment.
         v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
-	v_test,a_test, coeffs = self.create_splined_timings(q_list)
+    	v_test,a_test, coeffs = self.create_splined_timings(q_list)
         #print v_test
         #print a_test
-	print "\nq_list length\n"
-	print len(q_list)
-	print "\nCoeff stuff\n"
-	print len(coeffs)
-	print coeffs
-        
-	self.plot_trajectory(len(q_list)-1, coeffs, 1)
+    	print "\nq_list length\n"
+    	print len(q_list)
+    	print "\nCoeff stuff\n"
+    	print len(coeffs)
+    	print coeffs
+
+    	self.plot_trajectory(len(q_list)-1, coeffs, 1)
 
         return q_list, v_test, a_test, t
         # ---------------------------------------------------------------
@@ -367,11 +375,91 @@ class MoveArm(object):
 #            	q = self.q_from_joint_state(res.solution.joint_state)
 #        return q
 
+
+    #shortcutting
+    def shortcut(self,q_list):
+        q_copy = deepcopy(q_list)
+        first = 0
+        count = len(q_copy)
+        while (first < count):
+            #may cause a problem if first is larger than count, mid execution
+            #but i can't think of an example where that happens.
+            for second in range(first+2, len(q_copy)):
+                #+2 allows it to skip self test and next point test (those are connected already)
+                if (self.is_faster(q_list[first],q_list[second])):
+                    #check if we can short cut
+                    q_copy = numpy.delete(q_list,range(first+1,second),0)
+                    print "\n second"
+                    print second
+                    #if so, delete from next point to current point e.i.
+                    #if testing connection between point 0 and 2 delete 1
+                    #processing heavy as reiterates through allllll points, but should work
+            q_list = q_copy
+            print "\nfirst"
+            print first
+            #after deleting all the shortcupts reached from one point,
+            #update list and the count
+            count = len(q_copy)
+            first +=1
+        return q_list
+
+    #resampling using the most up-to-date list of points
+    #uses subdivide to generate list of points between two old ones
+    def resample(self, q_list):
+        q_re_list=[]
+        short = []
+        for point in range(0, len(q_list)):
+            if (point == (len(q_list)-1)):
+                q_re_list.append(q_list[point])
+            else:
+                short = self.subdivide(q_list[point],q_list[point+1])
+                q_re_list.append(numpy.delete(short,[len(short)-1],0))
+        return q_re_list
+
+    # test for possible shortcutting between two points
+    # should return 1 if nothng fails and 0 if something collides
+    def is_faster (self, q, q_1):
+        test_pass = 1
+        print "\ntesting"
+        escape=0
+        while (test_pass == 1 and escape != (len(self.subdivide(q,q_1))-1)):
+            print "\nwhile loop"
+            if ((len(self.subdivide(q,q_1))-1) <= 0):
+                break
+                #account for nothing in subdivide (is distnace is < 0.5)
+            for sub in range(0,len(self.subdivide(q,q_1))):
+                test_pass = self.is_state_valid(self.subdivide(q,q_1)[sub])
+            escape +=1
+            print "\n escape"
+            print sub, escape, len(self.subdivide(q,q_1))-1
+        print "\n done testing"
+        return test_pass
+
+    #Split the direct path between q_current and q_next into more points
+    #along the slope vector between them
+    def subdivide(self, q_current, q_next):
+        slope=numpy.subtract(q_next, q_current)
+        distance= 0
+        for joint in range(0, len(q_next)):
+            distance += math.pow((q_next[0]-q_current[0]),2)
+        distance = math.sqrt(distance)
+        n_seg = int(distance//.5)
+         #number of segments, rounding makes sure that segments will be at least .5
+        q_subdivided=[]
+        for inc in range(0, n_seg):
+            if (inc == n_seg):
+                q_subdivided.append(q_next)
+                #avoid shortening the last iteration due to rounding n_seg
+            else:
+                q_subdivided.append(numpy.add(q_current,numpy.dot(inc,slope)))
+                #inc =0 for first iteration so first point is q_current
+        return q_subdivided
+
     #	Used to calculate the next closest rrt point
     def create_rrt_map (self, q_current, q_goal, q_min, q_max):
 	#	Form a random point in the possible configuration space
 	q_points = []
-	for count in range(0,20):	#Create 50 points around each current position
+	for count in range(0,10):	#Create 50 points around each current position
 		q_intermediate = []
 		for pos in range (0,len(q_max)):
 			q_range = q_max[pos] - q_min[pos]
@@ -455,7 +543,7 @@ class MoveArm(object):
 	a_next = []
 	coeff_list = []
 	for pos in range(0,len(q_current)):
-		d = q_current[pos]	
+		d = q_current[pos]
 		c = v_current[pos]
 		b = a_current[pos]/2
 		a = q_next[pos] -d - c - b
@@ -463,7 +551,7 @@ class MoveArm(object):
 		a_next.append((6*a) + (2*b))
 		if (pos == 0):
 			coeff_list.append([a,b,c,d])
-	
+
 	return (v_next, a_next,coeff_list)
 
     def project_plan(self, q_start, q_goal, q_min, q_max):
@@ -479,7 +567,7 @@ class MoveArm(object):
         for i in range(0,len(joint_trajectory.points)):
             joint_trajectory.points[i].time_from_start = \
               rospy.Duration(joint_trajectory.points[i].time_from_start)
-        return joint_trajectory        
+        return joint_trajectory
 
     def create_trajectory(self, q_list, v_list, a_list, t):
         joint_trajectory = trajectory_msgs.msg.JointTrajectory()
@@ -584,7 +672,7 @@ class MoveArm(object):
     def plot_cb(self,feedback):
         handle = feedback.menu_entry_id
         state = self.menu_handler.getCheckState( handle )
-        if state == MenuHandler.CHECKED: 
+        if state == MenuHandler.CHECKED:
             self.show_plots = False
             print "Not showing plots"
             self.menu_handler.setCheckState( handle, MenuHandler.UNCHECKED )
@@ -594,7 +682,7 @@ class MoveArm(object):
             self.menu_handler.setCheckState( handle, MenuHandler.CHECKED )
         self.menu_handler.reApply(self.server)
         self.server.applyChanges()
-        
+
     def joint_states_callback(self, joint_state):
         self.mutex.acquire()
         self.q_current = joint_state.position
@@ -650,7 +738,7 @@ class MoveArm(object):
         menu_control = InteractiveMarkerControl()
         menu_control.interaction_mode = InteractiveMarkerControl.BUTTON
         menu_control.always_visible = True
-        box = Marker()        
+        box = Marker()
         box.type = Marker.CUBE
         box.scale.x = 0.15
         box.scale.y = 0.03
@@ -667,7 +755,7 @@ class MoveArm(object):
         menu_control.markers.append(box2)
         control_marker.controls.append(menu_control)
 
-        control_marker.scale = 0.25        
+        control_marker.scale = 0.25
         self.server.insert(control_marker, self.control_marker_feedback)
 
         self.menu_handler = MenuHandler()
@@ -696,4 +784,3 @@ if __name__ == '__main__':
     rospy.init_node('move_arm', anonymous=True)
     ma = MoveArm()
     rospy.spin()
-
