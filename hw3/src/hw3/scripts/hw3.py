@@ -392,7 +392,7 @@ class MoveArm(object):
             #but i can't think of an example where that happens.
             for second in range(first+2, len(q_copy)):
                 #+2 allows it to skip self test and next point test (those are connected already)
-                if (self.is_faster(q_list[first],q_list[second])):
+                if (self.is_valid_path(q_list[first],q_list[second])):
                     #check if we can short cut
                     q_copy = numpy.delete(q_list,range(first+1,second),0)
                     print "\n second"
@@ -517,29 +517,17 @@ class MoveArm(object):
 		#print "Distance = ", q_points[closest_index].distance_to(q_constructed)
 
 		#	If this final space is valid, add it, otherwise rerun
-		if (self.is_state_valid(q_constructed)):	#First check if endpoint is valid
-			valid_check = 1
-			#Then loop through and check points in increments of .1
-			while (valid_check < 5):
-				q_temp = deepcopy(q_constructed)				#Deepcopy to make sure we don't change q_constructed
-				for temp_pos in range(0,len(q_temp)):
-					q_temp[pos] -= q_points[closest_index].my_point[pos]	#remove closest index position to make sure only current segement gets reduced
-					q_temp[pos] *= .2*valid_check				#Use .2 because it already is at .5, so .2 means increments of .1
-					q_temp[pos] += q_points[closest_index].my_point[pos]	#add closest index position back in to shift it back
-				valid_check += 1
-				if not(self.is_state_valid(q_temp)):
-					valid_check += 10	#instantly breaks loop and != 5 so point isn't added
-			if (valid_check == 5):
-				print "NODE ADDED: ", len(q_points)
-				to_add = rrt_node(q_constructed)
-				to_add.set_parent(q_points[closest_index])
-				if (to_add.distance_to(q_goal) < shortest_distance):
-					shortest_distance = to_add.distance_to(q_goal)
-				print "Shortest Distance to goal: ", shortest_distance, ""
-				if (to_add.distance_to(q_current) > center_distance):
-					center_distance = to_add.distance_to(q_current)
-				print "Distance to center: ", center_distance, "\n"
-				q_points.append(to_add)
+		if (self.is_valid_path(q_constructed, q_points[closest_index].my_point)):
+			print "NODE ADDED: ", len(q_points)
+			to_add = rrt_node(q_constructed)
+			to_add.set_parent(q_points[closest_index])
+			if (to_add.distance_to(q_goal) < shortest_distance):
+				shortest_distance = to_add.distance_to(q_goal)
+			print "Shortest Distance to goal: ", shortest_distance, ""
+			if (to_add.distance_to(q_current) > center_distance):
+				center_distance = to_add.distance_to(q_current)
+			print "Distance to center: ", center_distance, "\n"
+			q_points.append(to_add)
 		
 		#	Now check if newest point is less than .5 away from goal
 		if (q_points[len(q_points)-1].distance_to(q_goal) <= 2*branch_length):
@@ -560,13 +548,23 @@ class MoveArm(object):
 	print "ABORTED, PASSED 2000 NODES"
 	return None
 
-    #	Calculates the absolute change in all q values to reach the goal
-    #	SHOULDN'T BE USED.  IS CRAP
-    def is_close_to (self,q_goal, q_to_check):
-	delta = 0
-	for x in range(0,len(q_goal)):
-		delta += abs(q_goal[x] - q_to_check[x])
-	return delta
+    #	Checks if the path to the next point is valid along .1 length increments
+    def is_valid_path (self, q_current, q_next):
+	#	Don't waste time calculating for bad beginnings or ends
+	if not(self.is_state_valid(q_current) or self.is_state_valid(q_next)):
+		return 0;
+	valid_check = 1
+	#Then loop through and check points in increments of .1
+	while (valid_check < 5):
+		q_temp = deepcopy(q_next)		#Deepcopy to make sure we don't change q_constructed
+		for pos in range(0,len(q_temp)):
+			q_temp[pos] -= q_current[pos]	#remove closest index position to make sure only current segement gets reduced
+			q_temp[pos] *= .2*valid_check	#Use .2 because it already is at .5, so .2 means increments of .1
+			q_temp[pos] += q_current[pos]	#add closest index position back in to shift it back
+		valid_check += 1
+		if not(self.is_state_valid(q_temp)):
+			return 0
+	return 1
 
     #	Combines all q_list values into v_lists, a_lists and plot coeffs
     def create_splined_timings (self, q_list):
