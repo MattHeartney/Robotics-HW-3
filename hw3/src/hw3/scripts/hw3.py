@@ -329,18 +329,24 @@ class MoveArm(object):
         # A provided convenience function creates the velocity and acceleration data,
         # assuming 0 velocity and acceleration at each intermediate point, and 10 seconds
         # for each trajectory segment.
-        v_list,a_list,t = self.compute_simple_timing(q_list, 10)
+        #v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
-    	#v_test,a_test, coeffs = self.create_splined_timings(q_list)
+
+    	v_test,a_test, coeffs = self.create_splined_timings(q_list)
+	#t is just an array from 0 to n, where n is the segment number, so create that array
+	t = []
+	for i in range(0,len(v_test)):
+	    t.append(i)
         #print v_test
         #print a_test
     	print "\nq_list length\n"
     	print len(q_list)
     	print "\nCoeff stuff\n"
-    	#print len(coeffs)
-    	#print coeffs
-
-    	#self.plot_trajectory(len(q_list)-1, coeffs, 1)
+    	print len(coeffs)
+    	print coeffs
+	#Unsure if need coefficients for all joints, so for now only pass the first joint's coefficients along
+	coeffsfirst = coeffs[0]
+    	self.plot_trajectory(len(q_list)-1, coeffsfirst, 1)
 
         #return q_list, v_test, a_test, t
 	return q_list, v_list, a_list, t
@@ -529,45 +535,80 @@ class MoveArm(object):
 	return delta
 
     #	Combines all q_list values into v_lists, a_lists and plot coeffs
-	#_____STILL HAS A PROBLEM WHEN NO INTERPOLATED POINTS_SPLIT_LATER______
     def create_splined_timings (self, q_list):
-	v_list = [[0,0,0,0,0,0,0]]
-	a_list = [[0,0,0,0,0,0,0]]
-	coeff_list = []
-	for pos in range (1,len(q_list)-1):
-		temp = self.create_cubic(q_list[pos-1], v_list[pos-1], a_list[pos-1], q_list[pos])
-		v_list.append(temp[0])
-		a_list.append(temp[1])
-		print "\nTEMP[2]\n"
-		print temp[2]
-		coeff_list.append(temp[2][0][0])
-		coeff_list.append(temp[2][0][1])
-		coeff_list.append(temp[2][0][2])
-		coeff_list.append(temp[2][0][3])
-	v_list.append([0,0,0,0,0,0,0])
-	a_list.append([0,0,0,0,0,0,0])
-	coeff_list.append(q_list[len(q_list)-1][0] - q_list[len(q_list)-2][0] - (.5*a_list[len(v_list)-2][0]) - v_list[len(v_list)-2][0])
-	coeff_list.append((3*q_list[len(q_list)-1][0]) - (3*q_list[len(q_list)-2][0])- (2*v_list[len(v_list)-2][0]))
-	coeff_list.append(v_list[len(v_list)-2][0])
-	coeff_list.append(q_list[len(v_list)-2][0])
-	return v_list, a_list, coeff_list
 
-    #	Creates the inbetween cubic functions for kinematic graphs to spline
-    def create_cubic(self, q_current, v_current, a_current, q_next):
-	v_next = []
-	a_next = []
-	coeff_list = []
-	for pos in range(0,len(q_current)):
-		d = q_current[pos]
-		c = v_current[pos]
-		b = a_current[pos]/2
-		a = q_next[pos] -d - c - b
-		v_next.append((3*a) + (2*b) + c)
-		a_next.append((6*a) + (2*b))
-		if (pos == 0):
-			coeff_list.append([a,b,c,d])
+	    coeff_list = []
+	    #Create v_list and a_list
+	    v_list = numpy.copy(q_list)
+	    a_list = numpy.copy(q_list)
+	    
+	    if len(q_list) > 2:
+		for pos in range(0,len(q_list[0])):
+		    qlistlength = len(q_list)
+		    #Note: qlistlength needs to be len(qlist) +1
+		    toplength = 2*qlistlength + 2*(qlistlength-1)-2
+		    sidelength = 4*(qlistlength-1)
+		    bigmatrix = numpy.matrix([[0 for x in range(sidelength)] for x in range(toplength)])
+		    length = qlistlength-1
+		    for i in range (0,length):
+		        bigmatrix[i,4*i] = 1
+		        bigmatrix[i,4*i+1]=1
+		        bigmatrix[i,4*i+2]=1
+		        bigmatrix[i,4*i+3]=1
+		    for i in range(0,length):
+		        bigmatrix[length+i,4*i+3] = 1
+		    for i in range(0,length-1):
+		        bigmatrix[2*length + i,4*i] = 3
+		        bigmatrix[2*length + i,4*i+1] = 2
+		        bigmatrix[2*length + i,4*i+2] = 1
+		        bigmatrix[2*length + i,4*i+6] = -1
+		    for i in range(0,length-1):
+		        bigmatrix[3*length-1 + i,4*i] = 6
+		        bigmatrix[3*length-1 + i,4*i+1] = 2
+		        bigmatrix[3*length-1 + i,4*i+5] = -2
+		    bigmatrix[4*length-2,2] = 1
+		    bigmatrix[4*length-1,sidelength-4] = 3
+		    bigmatrix[4*length-1,sidelength-3] = 2
+		    bigmatrix[4*length-1,sidelength-2] = 1
 
-	return (v_next, a_next,coeff_list)
+		    #list of coordinates
+		    qlist = numpy.zeros(length+1)
+		    #qlist= numpy.array([x for x in range(length+1)])
+		    for i in range(0, len(q_list)):
+		        qlist[i] = numpy.copy(q_list[i][pos])
+		    #c is the matrix in the relation bigmatrix * coefficients = c
+		    c = numpy.zeros(toplength)
+		    for i in range (0,length):
+		        c[i+length] = numpy.copy(qlist[i])
+		        c[i] = numpy.copy(qlist[i+1])
+
+
+		    #Create coefficients by linear algebra
+		    x= numpy.linalg.solve(bigmatrix,c)
+
+		    #Now add the coefficients to the coefficient array
+		    coeff_list.append(x) 
+		
+		    #Set initial values:
+		    a_list[0][pos] = 0
+		    v_list[0][pos] = 0
+		#Continue creating the rest of the a_list and v_list
+		for i in range (0,len(q_list)-1):
+		    for pos in range(0,len(q_list[1])):
+		        #Set up v_list and a_list for the next iteration
+		        v_list[i+1][pos] = 3*coeff_list[pos][4*i] + 2*coeff_list[pos][4*i+1] + coeff_list[pos][4*i+2]
+		        a_list[i+1][pos] = 6*coeff_list[pos][4*i] + 2*coeff_list[pos][4*i+1]
+		
+	    #If there is a straight path to the goal, use this function to avoid singularities
+	    else:
+		for pos in range (0, len(q_list[0])):
+		    v_list[0][pos] = 0
+		    v_list[1][pos] = 0
+		    coeff_list.append([-2*(q_list[0][pos]-q_list[1][pos]) , 3*(q_list[0][pos]-q_list[1][pos]), 0, q_list[0][pos]])
+		    a_list[0][pos] = 2*(q_list[0][pos]-q_list[1][pos])
+		    a_list[1][pos] = 6* (-2*(q_list[0][pos]-q_list[1][pos])) + 2*(q_list[0][pos]-q_list[1][pos])
+
+	    return v_list, a_list, coeff_list
 
     def project_plan(self, q_start, q_goal, q_min, q_max):
         q_list, v_list, a_list, t = self.motion_plan(q_start, q_goal, q_min, q_max)
