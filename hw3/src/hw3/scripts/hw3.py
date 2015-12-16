@@ -313,7 +313,7 @@ class MoveArm(object):
         q_list = self.create_rrt_map(q_start, q_goal, q_min, q_max)
 
 	if (q_list == None):
-            return [],[],[]
+            	return [],[],[],10
 
         #SHORTCUTTING
         print "\n Shortcut"
@@ -331,18 +331,19 @@ class MoveArm(object):
         # for each trajectory segment.
         v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
-    	v_test,a_test, coeffs = self.create_splined_timings(q_list)
+    	#v_test,a_test, coeffs = self.create_splined_timings(q_list)
         #print v_test
         #print a_test
     	print "\nq_list length\n"
     	print len(q_list)
     	print "\nCoeff stuff\n"
-    	print len(coeffs)
-    	print coeffs
+    	#print len(coeffs)
+    	#print coeffs
 
-    	self.plot_trajectory(len(q_list)-1, coeffs, 1)
+    	#self.plot_trajectory(len(q_list)-1, coeffs, 1)
 
-        return q_list, v_test, a_test, t
+        #return q_list, v_test, a_test, t
+	return q_list, v_list, a_list, t
         # ---------------------------------------------------------------
 
     #shortcutting
@@ -442,10 +443,12 @@ class MoveArm(object):
 		#	Is possible trying to only grab points around center due to random distribution?
 		q_random = []
 		for pos in range (0,len(q_max)):
-			q_range = (q_max[pos] - q_min[pos])
-			q_change = q_range*random.random()
-			q_random.append(random.uniform(q_min[pos],q_max[pos]))
-			#q_random.append(q_change + q_min[pos])
+			min_wall = q_min[pos]
+			max_wall = q_current[pos]
+			if (q_goal[pos] > q_current[pos]):
+				min_wall = q_current[pos]
+				max_wall = q_max[pos]
+			q_random.append(random.uniform(min_wall*1.1,max_wall*1.1))
 
 		#	Loop through q_points to find the closest point or the parent
 		#	TESTED AND WORKING
@@ -463,16 +466,16 @@ class MoveArm(object):
 		magnitude = 0
 		for pos in range(0,len(q_random)):
 			q_constructed.append(q_random[pos] - q_points[closest_index].my_point[pos])
+			#	Make sure we don't leave the bounds
+			if (q_constructed[pos] > q_max[pos]):
+				q_constructed[pos] = q_max[pos]	
+			if (q_constructed[pos] < q_min[pos]):
+				q_constructed[pos] = q_min[pos]
 			magnitude += q_constructed[pos]*q_constructed[pos]
 		magnitude = branch_length/math.sqrt(magnitude)
 		for pos in range(0,len(q_random)):
 			q_constructed[pos] *= magnitude
 			q_constructed[pos] += q_points[closest_index].my_point[pos]
-			#	Make sure we don't leave the bounds, may change the .5 limit, but shouldn't happen and this is safer
-			if (q_constructed[pos] > q_max[pos]):
-				q_constructed[pos] = q_max[pos]	
-			if (q_constructed[pos] < q_min[pos]):
-				q_constructed[pos] = q_min[pos]
 		#print "Distance = ", q_points[closest_index].distance_to(q_constructed)
 
 		#	If this final space is valid, add it, otherwise rerun
@@ -502,7 +505,7 @@ class MoveArm(object):
 				q_points.append(to_add)
 		
 		#	Now check if newest point is less than .5 away from goal
-		if (q_points[len(q_points)-1].distance_to(q_goal) <= 4*branch_length):
+		if (q_points[len(q_points)-1].distance_to(q_goal) <= 2*branch_length):
 			goal_node = rrt_node(q_goal)			# Create a final RRT node for the goal
 			goal_node.set_parent(q_points[len(q_points)-1])	# Make goal's parent this new close enough point
 			current_node = goal_node
