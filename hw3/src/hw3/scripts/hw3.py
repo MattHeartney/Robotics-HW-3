@@ -310,18 +310,39 @@ class MoveArm(object):
     def motion_plan(self, q_start, q_goal, q_min, q_max):
         # ---------------- replace this with your code ------------------
 
+#	q_list = self.create_rrt_map(q_start, q_goal, q_min, q_max)
+#        print "Example q_list:"
+#        print q_list
+#
+#	q_list = self.shortcut(q_list)
+#	q_list = self.resample(q_list)
+#	print q_list
+#
+#        # A provided convenience function creates the velocity and acceleration data, 
+#        # assuming 0 velocity and acceleration at each intermediate point, and 10 seconds
+#        # for each trajectory segment.
+#        v_list,a_list,t = self.compute_simple_timing(q_list, 10)
+#        print "Example v_list and a_list:"
+#        print v_list
+#        print a_list
+#        print "Example t:"
+#        print t
+#        return q_list, v_list, a_list, t
+
+	# -----------------ORIGINAL CODE FOR TESTING --------------------
+
         q_list = self.create_rrt_map(q_start, q_goal, q_min, q_max)
 
 	if (q_list == None):
-            	return [],[],[],10
+           	return [],[],[],10
 
         #SHORTCUTTING
         print "\n Shortcut"
-        self.shortcut(q_list)
+        q_short = self.shortcut(q_list)
 
         print q_list
         #RESAMPLING
-        self.resample(q_list)
+        q_list = self.resample(q_short)
 
     	print "\nExample q_list:"
         print q_list
@@ -332,17 +353,18 @@ class MoveArm(object):
         #v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
 
-    	v_test,a_test, coeffs = self.create_splined_timings(q_list)
+    	v_list,a_list, coeffs = self.create_splined_timings(q_list)
 	#t is just an array from 0 to n, where n is the segment number, so create that array
-	t = []
-	for i in range(0,len(v_test)):
-	    t.append(i)
+#	t = []
+#	for i in range(0,len(v_list)):
+#	    t.append(i)
+
+	t = [i*10 for i in range(0,len(q_list))]
+
         #print v_test
         #print a_test
     	print "\nq_list length\n"
     	print len(q_list)
-    	print "\nCoeff stuff\n"
-    	print len(coeffs)
     	print coeffs
 	#Unsure if need coefficients for all joints, so for now only pass the first joint's coefficients along
 	coeffsfirst = coeffs[0]
@@ -517,7 +539,10 @@ class MoveArm(object):
 			current_node = goal_node
 			path_to_goal = []
 			while (current_node != None):			# As long as we aren't at q_current (the only node without a parent), loop
-				path_to_goal.append(current_node.my_point)
+				q_to_add = numpy.zeros(len(current_node.my_point))
+				for i in range(0,len(current_node.my_point)):
+					q_to_add[i] = current_node.my_point[i]
+				path_to_goal.insert(0,q_to_add)
 				current_node = current_node.parent	# Trace back through parents until hits main node
 			print "PATH FOUND"
 			print "PRE PROCESS LENGTH"
