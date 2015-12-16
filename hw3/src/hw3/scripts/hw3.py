@@ -51,6 +51,25 @@ class RRTNode(object):
         self.q=numpy.zeros(7)
         self.parent = None
 
+#	The nodes of the RRT traversal tree
+class rrt_node:
+    def __init__(self, my_point_values):
+	self.my_point = my_point_values
+	self.parent = None
+
+#	Calculates the distance to the inserted point
+#	point should be an array of joint values
+    def distance_to(self, point):
+	to_return = 0
+	for pos in range(0,len(point)):
+		to_return += (self.my_point[pos]-point[pos])*(self.my_point[pos]-point[pos])
+	return math.sqrt(to_return)
+
+#	Sets this node's parent to the given node
+#	NOTE: parent_node MUST be another rrt_node
+    def set_parent(self, parent_node):
+	self.parent = parent_node
+
 class MoveArm(object):
 
     def __init__(self):
@@ -290,26 +309,11 @@ class MoveArm(object):
     """
     def motion_plan(self, q_start, q_goal, q_min, q_max):
         # ---------------- replace this with your code ------------------
-        # This simple example creates a trajectory with just the start and goal points
-        q_list = []
-        q_list.append(q_start)
-	#q_list.append(self.create_rrt_map(q_start,q_goal, q_min, q_max))
-        #q_list.append(q_goal)
 
-	# Wait for moveit IK service
-        rospy.wait_for_service("compute_fk")
-        self.fk_service = rospy.ServiceProxy('compute_fk',  moveit_msgs.srv.GetPositionFK)
-        print "FK service ready"
+        q_list = self.create_rrt_map(q_start, q_goal, q_min, q_max)
 
-    	#print self.FK(q_start)
-
-        print "\nSTARTING DISTANCE\n"
-        print self.is_close_to(q_goal, q_list[len(q_list)-1])
-        while (len(q_list) != 2000 and 2.5 < self.is_close_to(q_goal, q_list[len(q_list)-1])):
-            q_list.append(self.create_rrt_map(q_list[len(q_list)-1], q_goal, q_min, q_max))
-            print "\nAdded Distance"
-            print self.is_close_to(q_goal, q_list[len(q_list)-1])
-        q_list.append(q_goal)
+	if (q_list == None):
+            	return [],[],[],10
 
         #SHORTCUTTING
         print "\n Shortcut"
@@ -319,19 +323,20 @@ class MoveArm(object):
         #RESAMPLING
         self.resample(q_list)
 
-        if (len(q_list) > 2000):
-            print "\nEXCEEDED 2000 POINTS, ABORTING\n"
-            return [],[],[]
-
     	print "\nExample q_list:"
         print q_list
 
         # A provided convenience function creates the velocity and acceleration data,
         # assuming 0 velocity and acceleration at each intermediate point, and 10 seconds
         # for each trajectory segment.
-        v_list,a_list,t = self.compute_simple_timing(q_list, 10)
+        #v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
+
     	v_test,a_test, coeffs = self.create_splined_timings(q_list)
+	#t is just an array from 0 to n, where n is the segment number, so create that array
+	t = []
+	for i in range(0,len(v_test)):
+	    t.append(i)
         #print v_test
         #print a_test
     	print "\nq_list length\n"
@@ -339,42 +344,13 @@ class MoveArm(object):
     	print "\nCoeff stuff\n"
     	print len(coeffs)
     	print coeffs
+	#Unsure if need coefficients for all joints, so for now only pass the first joint's coefficients along
+	coeffsfirst = coeffs[0]
+    	self.plot_trajectory(len(q_list)-1, coeffsfirst, 1)
 
-    	self.plot_trajectory(len(q_list)-1, coeffs, 1)
-
-        return q_list, v_test, a_test, t
+        #return q_list, v_test, a_test, t
+	return q_list, v_list, a_list, t
         # ---------------------------------------------------------------
-
-	#	An attempt to reverse engineer the IK into a FK
-#    def FK(self, q_goal):
-        #req = moveit_msgs.srv.GetPositionFKRequest()
-        #req.fk_request.group_name = "left_arm"
-        #req.fk_request.robot_state = moveit_msgs.msg.RobotState()
-        #req.fk_request.robot_state.joint_state = self.joint_state
-        #req.fk_request.pose_stamped = geometry_msgs.msg.PoseStamped()
-        #req.fk_request.pose_stamped.header.frame_id = "base"
-        #req.fk_request.pose_stamped.header.stamp = rospy.get_rostime()
-        #req.fk_request.pose_stamped.pose = convert_to_message(T_goal)
-        #req.fk_request.timeout = rospy.Duration(3.0)
-        #res = self.fk_service(req)
-	#fk_request = kinematics_msgs.GetPositionFK.Request;
-	#kinematics_msgs::GetPositionFK::Response fk_response;
-	#fk_request.header.frame_id = "base";
-	#fk_request.pose_stamped.header.stamp = rospy.get_rostime()
-	#fk_request.fk_link_names = self.joint_names
-	#fk_request.robot_state.joint_state.position.resize (response.kinematic_solver_info.joint_names.size());
-	#fk_request.robot_state.joint_state.name = response.kinematic_solver_info.joint_names;
-        #q = []
-	#print "\nIMPORTANT\n"
-	#print res.error_code
-	#print "\nIMPORTANT\n"
-        #if fk_response.error_code.val == res.error_code.SUCCESS:
-#		print "\nIMPORTANT\n"
-#		print res.solution
-#		print "\nIMPORTANT\n"
-#            	q = self.q_from_joint_state(res.solution.joint_state)
-#        return q
-
 
     #shortcutting
     def shortcut(self,q_list):
@@ -458,55 +434,100 @@ class MoveArm(object):
     #	Used to calculate the next closest rrt point
     def create_rrt_map (self, q_current, q_goal, q_min, q_max):
 	#	Form a random point in the possible configuration space
-	q_points = []
-	for count in range(0,10):	#Create 50 points around each current position
-		q_intermediate = []
+	q_points = [rrt_node(q_current)]	#The complete tree
+	branch_length = .5			#The pre-determined length of the branches
+
+	#	------Testing Variables-------	
+	shortest_distance = q_points[0].distance_to(q_goal)
+	shortest_random_distance = 1000
+	center_distance = q_points[0].distance_to(q_current)
+	#	------Testing Variables-------	
+
+	for count in range(0,2000):
+		#	Choose a random point within the possibility space
+		#	TESTED AND WORKING
+		#	Is possible trying to only grab points around center due to random distribution?
+		q_random = []
 		for pos in range (0,len(q_max)):
-			q_range = q_max[pos] - q_min[pos]
-			q_change = q_range*random.random()
-			q_intermediate.append(q_change + q_min[pos])
+			min_wall = q_min[pos]
+			max_wall = q_current[pos]
+			if (q_goal[pos] > q_current[pos]):
+				min_wall = q_current[pos]
+				max_wall = q_max[pos]
+			q_random.append(random.uniform(min_wall*1.1,max_wall*1.1))
 
-		#	Rescale the magnitude of the random point to .5 and add it to the current position
-		intermediate_magnitude = 0
-		for pos in range(0,len(q_intermediate)):
-			#intermediate_magnitude += q_intermediate[pos]*q_intermediate[pos]
-			intermediate_magnitude += abs(q_intermediate[pos])
-		#intermediate_magnitude = .5 / math.sqrt(intermediate_magnitude)
-		intermediate_magnitude = .5 / math.sqrt(intermediate_magnitude)
-		for pos in range(0,len(q_intermediate)):
-			q_intermediate[pos] *= intermediate_magnitude
-			q_intermediate[pos] += q_current[pos]
-			if (q_intermediate[pos] > q_max[pos]):
-				q_intermediate[pos] = q_max[pos]	#Make sure we don't leave the bounds
-			if (q_intermediate[pos] < q_min[pos]):
-				q_intermediate[pos] = q_min[pos]
+		#	Loop through q_points to find the closest point or the parent
+		#	TESTED AND WORKING
+		closest_index = 0
+		closest_distance = q_points[closest_index].distance_to(q_random)
+		for pos in range(1,len(q_points)):
+			current_distance = q_points[pos].distance_to(q_random)
+			if (current_distance < closest_distance):
+				closest_index = pos
+				closest_distance = current_distance
+		
+		#	Construct a new point .5 away from the closest point towards the new point
+		#	TESTED AND 95% SURE IS WORKING (does length .5)
+		q_constructed = []
+		magnitude = 0
+		for pos in range(0,len(q_random)):
+			q_constructed.append(q_random[pos] - q_points[closest_index].my_point[pos])
+			#	Make sure we don't leave the bounds
+			if (q_constructed[pos] > q_max[pos]):
+				q_constructed[pos] = q_max[pos]	
+			if (q_constructed[pos] < q_min[pos]):
+				q_constructed[pos] = q_min[pos]
+			magnitude += q_constructed[pos]*q_constructed[pos]
+		magnitude = branch_length/math.sqrt(magnitude)
+		for pos in range(0,len(q_random)):
+			q_constructed[pos] *= magnitude
+			q_constructed[pos] += q_points[closest_index].my_point[pos]
+		#print "Distance = ", q_points[closest_index].distance_to(q_constructed)
 
-		#	If this final space is valid, return it, otherwise rerun
-		if (self.is_state_valid(q_intermediate)):
+		#	If this final space is valid, add it, otherwise rerun
+		if (self.is_state_valid(q_constructed)):	#First check if endpoint is valid
 			valid_check = 1
-			while (valid_check < 5 and valid_check != -1):
-				q_temp = deepcopy(q_intermediate)
+			#Then loop through and check points in increments of .1
+			while (valid_check < 5):
+				q_temp = deepcopy(q_constructed)				#Deepcopy to make sure we don't change q_constructed
 				for temp_pos in range(0,len(q_temp)):
-					q_temp[pos] -= q_current[pos]
-					q_temp[pos] *= .1*valid_check
-					q_temp[pos] += q_current[pos]
-				if not(self.is_state_valid(q_temp)):
-					valid_check = -1
+					q_temp[pos] -= q_points[closest_index].my_point[pos]	#remove closest index position to make sure only current segement gets reduced
+					q_temp[pos] *= .2*valid_check				#Use .2 because it already is at .5, so .2 means increments of .1
+					q_temp[pos] += q_points[closest_index].my_point[pos]	#add closest index position back in to shift it back
 				valid_check += 1
+				if not(self.is_state_valid(q_temp)):
+					count -= 1		#Take away 1 to maintain 2000 max length
+					valid_check += 10	#instantly breaks loop and != 5 so point isn't added
 			if (valid_check == 5):
-				q_points.append(q_intermediate)
-	best_index = -1
-	min_distance = self.is_close_to(q_goal, q_current)
-	for pos in range(1,len(q_points)):
-		current_distance = self.is_close_to(q_goal,q_points[1])
-		if (current_distance < min_distance):
-			best_index = pos
-			min_distance = current_distance
-	if (best_index == -1):
-		return self.create_rrt_map(q_current, q_goal, q_min, q_max)
-	return q_points[best_index]
+				print "NODE ADDED: ", count
+				to_add = rrt_node(q_constructed)
+				to_add.set_parent(q_points[closest_index])
+				if (to_add.distance_to(q_goal) < shortest_distance):
+					shortest_distance = to_add.distance_to(q_goal)
+				print "Shortest Distance to goal: ", shortest_distance, ""
+				if (to_add.distance_to(q_current) > center_distance):
+					center_distance = to_add.distance_to(q_current)
+				print "Distance to center: ", center_distance, "\n"
+				q_points.append(to_add)
+		
+		#	Now check if newest point is less than .5 away from goal
+		if (q_points[len(q_points)-1].distance_to(q_goal) <= 2*branch_length):
+			goal_node = rrt_node(q_goal)			# Create a final RRT node for the goal
+			goal_node.set_parent(q_points[len(q_points)-1])	# Make goal's parent this new close enough point
+			current_node = goal_node
+			path_to_goal = []
+			while (current_node != None):			# As long as we aren't at q_current (the only node without a parent), loop
+				path_to_goal.append(current_node.my_point)
+				current_node = current_node.parent	# Trace back through parents until hits main node
+			print "PATH FOUND"
+			print "PRE PROCESS LENGTH"
+			print len(path_to_goal)
+			return path_to_goal
+	print "ABORTED, PASSED 2000 NODES"
+	return None
 
     #	Calculates the absolute change in all q values to reach the goal
+    #	SHOULDN'T BE USED.  IS CRAP
     def is_close_to (self,q_goal, q_to_check):
 	delta = 0
 	for x in range(0,len(q_goal)):
@@ -514,45 +535,80 @@ class MoveArm(object):
 	return delta
 
     #	Combines all q_list values into v_lists, a_lists and plot coeffs
-	#_____STILL HAS A PROBLEM WHEN NO INTERPOLATED POINTS_SPLIT_LATER______
     def create_splined_timings (self, q_list):
-	v_list = [[0,0,0,0,0,0,0]]
-	a_list = [[0,0,0,0,0,0,0]]
-	coeff_list = []
-	for pos in range (1,len(q_list)-1):
-		temp = self.create_cubic(q_list[pos-1], v_list[pos-1], a_list[pos-1], q_list[pos])
-		v_list.append(temp[0])
-		a_list.append(temp[1])
-		print "\nTEMP[2]\n"
-		print temp[2]
-		coeff_list.append(temp[2][0][0])
-		coeff_list.append(temp[2][0][1])
-		coeff_list.append(temp[2][0][2])
-		coeff_list.append(temp[2][0][3])
-	v_list.append([0,0,0,0,0,0,0])
-	a_list.append([0,0,0,0,0,0,0])
-	coeff_list.append(q_list[len(q_list)-1][0] - q_list[len(q_list)-2][0] - (.5*a_list[len(v_list)-2][0]) - v_list[len(v_list)-2][0])
-	coeff_list.append((3*q_list[len(q_list)-1][0]) - (3*q_list[len(q_list)-2][0])- (2*v_list[len(v_list)-2][0]))
-	coeff_list.append(v_list[len(v_list)-2][0])
-	coeff_list.append(q_list[len(v_list)-2][0])
-	return v_list, a_list, coeff_list
 
-    #	Creates the inbetween cubic functions for kinematic graphs to spline
-    def create_cubic(self, q_current, v_current, a_current, q_next):
-	v_next = []
-	a_next = []
-	coeff_list = []
-	for pos in range(0,len(q_current)):
-		d = q_current[pos]
-		c = v_current[pos]
-		b = a_current[pos]/2
-		a = q_next[pos] -d - c - b
-		v_next.append((3*a) + (2*b) + c)
-		a_next.append((6*a) + (2*b))
-		if (pos == 0):
-			coeff_list.append([a,b,c,d])
+	    coeff_list = []
+	    #Create v_list and a_list
+	    v_list = numpy.copy(q_list)
+	    a_list = numpy.copy(q_list)
+	    
+	    if len(q_list) > 2:
+		for pos in range(0,len(q_list[0])):
+		    qlistlength = len(q_list)
+		    #Note: qlistlength needs to be len(qlist) +1
+		    toplength = 2*qlistlength + 2*(qlistlength-1)-2
+		    sidelength = 4*(qlistlength-1)
+		    bigmatrix = numpy.matrix([[0 for x in range(sidelength)] for x in range(toplength)])
+		    length = qlistlength-1
+		    for i in range (0,length):
+		        bigmatrix[i,4*i] = 1
+		        bigmatrix[i,4*i+1]=1
+		        bigmatrix[i,4*i+2]=1
+		        bigmatrix[i,4*i+3]=1
+		    for i in range(0,length):
+		        bigmatrix[length+i,4*i+3] = 1
+		    for i in range(0,length-1):
+		        bigmatrix[2*length + i,4*i] = 3
+		        bigmatrix[2*length + i,4*i+1] = 2
+		        bigmatrix[2*length + i,4*i+2] = 1
+		        bigmatrix[2*length + i,4*i+6] = -1
+		    for i in range(0,length-1):
+		        bigmatrix[3*length-1 + i,4*i] = 6
+		        bigmatrix[3*length-1 + i,4*i+1] = 2
+		        bigmatrix[3*length-1 + i,4*i+5] = -2
+		    bigmatrix[4*length-2,2] = 1
+		    bigmatrix[4*length-1,sidelength-4] = 3
+		    bigmatrix[4*length-1,sidelength-3] = 2
+		    bigmatrix[4*length-1,sidelength-2] = 1
 
-	return (v_next, a_next,coeff_list)
+		    #list of coordinates
+		    qlist = numpy.zeros(length+1)
+		    #qlist= numpy.array([x for x in range(length+1)])
+		    for i in range(0, len(q_list)):
+		        qlist[i] = numpy.copy(q_list[i][pos])
+		    #c is the matrix in the relation bigmatrix * coefficients = c
+		    c = numpy.zeros(toplength)
+		    for i in range (0,length):
+		        c[i+length] = numpy.copy(qlist[i])
+		        c[i] = numpy.copy(qlist[i+1])
+
+
+		    #Create coefficients by linear algebra
+		    x= numpy.linalg.solve(bigmatrix,c)
+
+		    #Now add the coefficients to the coefficient array
+		    coeff_list.append(x) 
+		
+		    #Set initial values:
+		    a_list[0][pos] = 0
+		    v_list[0][pos] = 0
+		#Continue creating the rest of the a_list and v_list
+		for i in range (0,len(q_list)-1):
+		    for pos in range(0,len(q_list[1])):
+		        #Set up v_list and a_list for the next iteration
+		        v_list[i+1][pos] = 3*coeff_list[pos][4*i] + 2*coeff_list[pos][4*i+1] + coeff_list[pos][4*i+2]
+		        a_list[i+1][pos] = 6*coeff_list[pos][4*i] + 2*coeff_list[pos][4*i+1]
+		
+	    #If there is a straight path to the goal, use this function to avoid singularities
+	    else:
+		for pos in range (0, len(q_list[0])):
+		    v_list[0][pos] = 0
+		    v_list[1][pos] = 0
+		    coeff_list.append([-2*(q_list[0][pos]-q_list[1][pos]) , 3*(q_list[0][pos]-q_list[1][pos]), 0, q_list[0][pos]])
+		    a_list[0][pos] = 2*(q_list[0][pos]-q_list[1][pos])
+		    a_list[1][pos] = 6* (-2*(q_list[0][pos]-q_list[1][pos])) + 2*(q_list[0][pos]-q_list[1][pos])
+
+	    return v_list, a_list, coeff_list
 
     def project_plan(self, q_start, q_goal, q_min, q_max):
         q_list, v_list, a_list, t = self.motion_plan(q_start, q_goal, q_min, q_max)
