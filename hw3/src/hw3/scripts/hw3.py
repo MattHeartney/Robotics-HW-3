@@ -331,21 +331,23 @@ class MoveArm(object):
 
 	# -----------------ORIGINAL CODE FOR TESTING --------------------
 
+	
+
         q_list = self.create_rrt_map(q_start, q_goal, q_min, q_max)
 
 	if (q_list == None):
            	return [],[],[],10
 
         #SHORTCUTTING
-        print "\n Shortcut"
-        q_short = self.shortcut(q_list)
+        #print "\n Shortcut"
+        q_list = self.shortcut(q_list)
 
-        print q_list
+        #print q_list
         #RESAMPLING
-        q_list = self.resample(q_short)
+        #q_list = self.resample(q_short)
 
-    	print "\nExample q_list:"
         print q_list
+	
 
         # A provided convenience function creates the velocity and acceleration data,
         # assuming 0 velocity and acceleration at each intermediate point, and 10 seconds
@@ -353,7 +355,8 @@ class MoveArm(object):
         #v_list,a_list,t = self.compute_simple_timing(q_list, 10)
         #print "\nExample v_list and a_list:"
 
-    	v_list,a_list, coeffs = self.create_splined_timings(q_list)
+	v_list,a_list,t = self.compute_simple_timing(q_list, 10)
+    	#v_list,a_list, coeffs = self.create_splined_timings(q_list)
 	#t is just an array from 0 to n, where n is the segment number, so create that array
 #	t = []
 #	for i in range(0,len(v_list)):
@@ -365,10 +368,15 @@ class MoveArm(object):
         #print a_test
     	print "\nq_list length\n"
     	print len(q_list)
-    	print coeffs
+    	#print coeffs
 	#Unsure if need coefficients for all joints, so for now only pass the first joint's coefficients along
-	coeffsfirst = coeffs[0]
-    	self.plot_trajectory(len(q_list)-1, coeffsfirst, 1)
+	#Only plot trajectories if the marker is selected
+    	if self.show_plots == True:
+        	print "THE MARKER IS SELECTED, SHOW PLOTS"
+        	coeffsfirst = coeffs[0]
+            	self.plot_trajectory(len(q_list)-1, coeffsfirst, 1)
+    	else:
+        	print "THE MARKER IS NOT SELECTED. DO NOT SHOW PLOTS"
 
         #return q_list, v_test, a_test, t
 	return q_list, v_list, a_list, t
@@ -406,11 +414,11 @@ class MoveArm(object):
     def resample(self, q_list):
         q_re_list=[]
         short = []
-        for point in range(0, len(q_list)):
+        for point in range(0, len(q_list)-1):
+            short = self.subdivide(q_list[point],q_list[point+1])
             if (point == (len(q_list)-1)):
-                q_re_list.append(q_list[point])
+                q_re_list.append(short)
             else:
-                short = self.subdivide(q_list[point],q_list[point+1])
                 q_re_list.append(numpy.delete(short,[len(short)-1],0))
         return q_re_list
 
@@ -422,11 +430,12 @@ class MoveArm(object):
         escape=0
         while (test_pass == 1 and escape != (len(self.subdivide(q,q_1))-1)):
             print "\nwhile loop"
-            if ((len(self.subdivide(q,q_1))-1) <= 0):
+	    subdivided = self.subdivide(q,q_1)
+            if ((len(subdivided)-1) <= 0):
                 break
                 #account for nothing in subdivide (is distnace is < 0.5)
-            for sub in range(0,len(self.subdivide(q,q_1))):
-                test_pass = self.is_state_valid(self.subdivide(q,q_1)[sub])
+            for sub in range(0,len(subdivided)):
+                test_pass = self.is_state_valid(subdivided[sub])
             escape +=1
             print "\n escape"
             print sub, escape, len(self.subdivide(q,q_1))-1
@@ -442,6 +451,7 @@ class MoveArm(object):
             distance += math.pow((q_next[0]-q_current[0]),2)
         distance = math.sqrt(distance)
         n_seg = int(distance//.5)
+	print "number of segments: ",n_seg
          #number of segments, rounding makes sure that segments will be at least .5
         q_subdivided=[]
         for inc in range(0, n_seg):
@@ -465,7 +475,7 @@ class MoveArm(object):
 	center_distance = q_points[0].distance_to(q_current)
 	#	------Testing Variables-------	
 
-	for count in range(0,2000):
+	while (len(q_points) < 2000):
 		#	Choose a random point within the possibility space
 		#	TESTED AND WORKING
 		#	Is possible trying to only grab points around center due to random distribution?
@@ -518,10 +528,9 @@ class MoveArm(object):
 					q_temp[pos] += q_points[closest_index].my_point[pos]	#add closest index position back in to shift it back
 				valid_check += 1
 				if not(self.is_state_valid(q_temp)):
-					count -= 1		#Take away 1 to maintain 2000 max length
 					valid_check += 10	#instantly breaks loop and != 5 so point isn't added
 			if (valid_check == 5):
-				print "NODE ADDED: ", count
+				print "NODE ADDED: ", len(q_points)
 				to_add = rrt_node(q_constructed)
 				to_add.set_parent(q_points[closest_index])
 				if (to_add.distance_to(q_goal) < shortest_distance):
