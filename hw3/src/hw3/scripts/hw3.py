@@ -444,7 +444,8 @@ class MoveArm(object):
 		for pos in range (0,len(q_max)):
 			q_range = (q_max[pos] - q_min[pos])
 			q_change = q_range*random.random()
-			q_random.append(q_change + q_min[pos])
+			q_random.append(random.uniform(q_min[pos],q_max[pos]))
+			#q_random.append(q_change + q_min[pos])
 
 		#	Loop through q_points to find the closest point or the parent
 		#	TESTED AND WORKING
