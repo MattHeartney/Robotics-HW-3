@@ -395,14 +395,10 @@ class MoveArm(object):
                 if (self.is_valid_path(q_list[first],q_list[second])):
                     #check if we can short cut
                     q_copy = numpy.delete(q_list,range(first+1,second),0)
-                    print "\n second"
-                    print second
                     #if so, delete from next point to current point e.i.
                     #if testing connection between point 0 and 2 delete 1
                     #processing heavy as reiterates through allllll points, but should work
             q_list = q_copy
-            print "\nfirst"
-            print first
             #after deleting all the shortcupts reached from one point,
             #update list and the count
             count = len(q_copy)
@@ -523,10 +519,10 @@ class MoveArm(object):
 			to_add.set_parent(q_points[closest_index])
 			if (to_add.distance_to(q_goal) < shortest_distance):
 				shortest_distance = to_add.distance_to(q_goal)
-			print "Shortest Distance to goal: ", shortest_distance, ""
+			#print "Shortest Distance to goal: ", shortest_distance, ""
 			if (to_add.distance_to(q_current) > center_distance):
 				center_distance = to_add.distance_to(q_current)
-			print "Distance to center: ", center_distance, "\n"
+			#print "Distance to center: ", center_distance, "\n"
 			q_points.append(to_add)
 		
 		#	Now check if newest point is less than .5 away from goal
@@ -603,6 +599,8 @@ class MoveArm(object):
 		    bigmatrix[4*length-1,sidelength-3] = 2
 		    bigmatrix[4*length-1,sidelength-2] = 1
 
+		    print "Big Matrix: \n",bigmatrix
+
 		    #list of coordinates
 		    qlist = numpy.zeros(length+1)
 		    #qlist= numpy.array([x for x in range(length+1)])
@@ -636,7 +634,9 @@ class MoveArm(object):
 		for pos in range (0, len(q_list[0])):
 		    v_list[0][pos] = 0
 		    v_list[1][pos] = 0
-		    coeff_list.append([-2*(q_list[0][pos]-q_list[1][pos]) , 3*(q_list[0][pos]-q_list[1][pos]), 0, q_list[0][pos]])
+		    coeff_list.append([2*(q_list[1][pos]-q_list[0][pos]) , 3*(q_list[0][pos]-q_list[1][pos]), 0, q_list[0][pos]])
+		    #a_list[0][pos] = 6*(q_list[0][pos] - q_list[1][pos])
+		    #a_list[1][pos] = -1*a_list[0][pos]
 		    a_list[0][pos] = 2*(q_list[0][pos]-q_list[1][pos])
 		    a_list[1][pos] = 6* (-2*(q_list[0][pos]-q_list[1][pos])) + 2*(q_list[0][pos]-q_list[1][pos])
 
